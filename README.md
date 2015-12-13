@@ -6,8 +6,5 @@ Style Google Docs with markdown
 - Multi-line code with triple backticks
 - Links with `[link name](http://link/address)`
 
-#### Google doc before running reMarkable:
-![before](./before.png?raw=true)
-
-#### After running reMarkable:
-![after](./after.png?raw=true)
+#### reMarkable in action:
+![screengrab](./screengrab.gif?raw=true)

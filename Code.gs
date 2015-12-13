@@ -27,8 +27,6 @@ function formatMarkdown() {
  * Search for two lines starting with ``` in the doc,
  * and add all the lines appearing between them into a single-cell
  * table, set the font to a monospace font.
- *
- * TODO(sujeet): Syntax highliting (using hilite.me maybe?).
  */
 function processSourceCode() {
   var doc = DocumentApp.getActiveDocument();
@@ -63,8 +61,62 @@ function processSourceCode() {
                  .setBorderWidth(0)
                  .appendTableRow()
                  .appendTableCell();
-  cell.setText(code.trim());
-  cell.setBackgroundColor('#f0f0f2');
+
+  var params = {
+    'code': code.trim(),
+    'lexer': /```(.*)/.exec(firstLine.asText().getText())[1],
+    'style': 'monokai'
+  };
+  var response = UrlFetchApp.fetch(
+    "http://hilite.me/api",
+    {
+      'method': 'post',
+      'payload': params
+    }
+  );
+
+  var xmlDoc = XmlService.parse(response.getContentText());
+  // The XML document is structured as
+  // - comment
+  // - div
+  //   - pre
+  //     - spans
+  var divTag = xmlDoc.getAllContent()[1];
+  var preTag = divTag.getAllContent()[0];
+  var spans_or_texts = preTag.getAllContent();
+  var span_ranges = [];
+
+  var startCharIdx = 0;
+  for (var i = 0; i < spans_or_texts.length; ++i) {
+    var span_or_text = spans_or_texts[i];
+    if (span_or_text.getType() == XmlService.ContentTypes.ELEMENT) {
+      // We are seeing a span (spans are styled while texts are not)
+      var span_range = {
+        start: startCharIdx,
+        endInclusive: startCharIdx + span_or_text.getValue().length - 1,
+        span: span_or_text
+      };
+      span_ranges.push(span_range);
+    }
+    startCharIdx += span_or_text.getValue().length;
+  }
+
+  var getTagColor = function (tag) {
+    return tag.getAttribute('style').getValue().match(/#[0-9 a-f A-F]{6}/);
+  };
+
+  cell.setText(preTag.getValue().trim());
+
+  var cellText = cell.editAsText();
+  for (var i = 0; i < span_ranges.length; ++i) {
+    var span_range = span_ranges[i];
+    cellText.setForegroundColor(
+      span_range.start,
+      span_range.endInclusive,
+      getTagColor(span_range.span)
+    );
+  }
+  cell.setBackgroundColor(getTagColor(divTag));
   cell.setFontFamily('Consolas');
   
   processSourceCode();
